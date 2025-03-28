@@ -1,0 +1,2 @@
+/api/chatwork/*  https://api.chatwork.com/:splat  200
+/*              /index.html                       200
