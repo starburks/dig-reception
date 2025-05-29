@@ -12,6 +12,27 @@ type VisitorInfo = {
 
 type AppointmentType = 'appointment' | 'walkin' | null;
 
+// 五十音配列の定義
+const GOJUON = [
+  'あ', 'い', 'う', 'え', 'お',
+  'か', 'き', 'く', 'け', 'こ',
+  'さ', 'し', 'す', 'せ', 'そ',
+  'た', 'ち', 'つ', 'て', 'と',
+  'な', 'に', 'ぬ', 'ね', 'の',
+  'は', 'ひ', 'ふ', 'へ', 'ほ',
+  'ま', 'み', 'む', 'め', 'も',
+  'や', 'ゆ', 'よ',
+  'ら', 'り', 'る', 'れ', 'ろ',
+  'わ', 'を', 'ん'
+];
+
+// カタカナをひらがなに変換する関数
+const toHiragana = (str: string) => {
+  return str.replace(/[\u30A1-\u30F6]/g, function(match) {
+    return String.fromCharCode(match.charCodeAt(0) - 0x60);
+  });
+};
+
 function VisitorApp() {
   const [step, setStep] = useState<'home' | 'appointment' | 'form' | 'staff' | 'complete'>('home');
   const [appointmentType, setAppointmentType] = useState<AppointmentType>(null);
@@ -279,18 +300,38 @@ function VisitorApp() {
   );
 
   const renderStaffSelection = () => {
-    // Group staff members by first character of their name
+    // Group staff members by first character of their name (in hiragana)
     const groupedStaff = staffMembers.reduce((acc, staff) => {
-      const firstChar = staff.name.charAt(0);
-      if (!acc[firstChar]) {
-        acc[firstChar] = [];
+      // Convert name to hiragana for grouping
+      const nameHiragana = toHiragana(staff.name);
+      const firstChar = nameHiragana.charAt(0);
+      
+      // Find the corresponding gojuon group
+      const group = GOJUON.find(char => {
+        if (firstChar === char) return true;
+        // Handle dakuon and handakuon
+        if (firstChar === 'が' && char === 'か') return true;
+        if (firstChar === 'ざ' && char === 'さ') return true;
+        if (firstChar === 'だ' && char === 'た') return true;
+        if (firstChar === 'ば' && char === 'は') return true;
+        if (firstChar === 'ぱ' && char === 'は') return true;
+        return false;
+      }) || 'その他';
+
+      if (!acc[group]) {
+        acc[group] = [];
       }
-      acc[firstChar].push(staff);
+      acc[group].push(staff);
       return acc;
     }, {} as Record<string, StaffMember[]>);
 
-    // Sort the keys (first characters) in Japanese alphabetical order
-    const sortedKeys = Object.keys(groupedStaff).sort((a, b) => a.localeCompare(b, 'ja'));
+    // Sort staff within each group
+    Object.keys(groupedStaff).forEach(key => {
+      groupedStaff[key].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    });
+
+    // Get active groups (those that have staff members)
+    const activeGroups = GOJUON.filter(char => groupedStaff[char]?.length > 0);
 
     return (
       <div className="w-full max-w-2xl mx-auto animate-slide-in">
@@ -307,13 +348,38 @@ function VisitorApp() {
             </div>
           ) : (
             <div className="space-y-8">
-              {sortedKeys.map((key) => (
-                <div key={key} className="animate-scale-in">
+              {/* 五十音インデックス */}
+              <div className="flex flex-wrap gap-2 mb-6 border-b pb-4">
+                {GOJUON.map((char) => {
+                  const isActive = activeGroups.includes(char);
+                  return (
+                    <button
+                      key={char}
+                      onClick={() => {
+                        if (isActive) {
+                          const element = document.getElementById(`group-${char}`);
+                          element?.scrollIntoView({ behavior: 'smooth' });
+                        }
+                      }}
+                      className={`w-8 h-8 flex items-center justify-center rounded-full text-sm
+                        ${isActive 
+                          ? 'bg-blue-100 text-blue-600 hover:bg-blue-200 cursor-pointer' 
+                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                    >
+                      {char}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Staff list grouped by gojuon */}
+              {activeGroups.map((group) => (
+                <div key={group} id={`group-${group}`} className="animate-scale-in">
                   <h3 className="text-xl font-bold text-gray-700 mb-4 border-b-2 border-gray-200 pb-2">
-                    {key}
+                    {group}行
                   </h3>
                   <div className="grid grid-cols-1 gap-4">
-                    {groupedStaff[key].map((staff) => (
+                    {groupedStaff[group].map((staff) => (
                       <button
                         key={staff.id}
                         onClick={() => handleStaffSelect(staff.id)}
