@@ -13,17 +13,14 @@ type VisitorInfo = {
 type AppointmentType = 'appointment' | 'walkin' | null;
 
 function VisitorApp() {
-  const [step, setStep] = useState<'home' | 'appointment' | 'form' | 'company' | 'staff' | 'complete'>('home');
+  const [step, setStep] = useState<'home' | 'appointment' | 'form' | 'staff' | 'complete'>('home');
   const [appointmentType, setAppointmentType] = useState<AppointmentType>(null);
   const [visitorInfo, setVisitorInfo] = useState<VisitorInfo>({ name: '', company: '' });
-  const [companies, setCompanies] = useState<Company[]>([]);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
-  const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [selectedStaff, setSelectedStaff] = useState<string>('');
   const [countdown, setCountdown] = useState(5);
   const [isButtonHovered, setIsButtonHovered] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isCompanyLoading, setIsCompanyLoading] = useState(false);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -32,17 +29,16 @@ function VisitorApp() {
         toast.error('データベース接続に失敗しました');
         return;
       }
-      await fetchCompanies();
     };
 
     initializeApp();
   }, []);
 
   useEffect(() => {
-    if (selectedCompany) {
-      fetchStaffMembers(selectedCompany);
+    if (step === 'staff') {
+      fetchAllStaffMembers();
     }
-  }, [selectedCompany]);
+  }, [step]);
 
   useEffect(() => {
     if (step === 'complete') {
@@ -52,7 +48,6 @@ function VisitorApp() {
             clearInterval(timer);
             setStep('home');
             setVisitorInfo({ name: '', company: '' });
-            setSelectedCompany('');
             setSelectedStaff('');
             setAppointmentType(null);
             return 5;
@@ -64,44 +59,17 @@ function VisitorApp() {
     }
   }, [step]);
 
-  const fetchCompanies = async () => {
-    setIsCompanyLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('*')
-        .order('name');
-      
-      if (error) {
-        console.error('Error fetching companies:', error);
-        await supabase.from('error_logs').insert([{
-          error_message: 'Failed to fetch companies',
-          error_stack: error.message
-        }]);
-        toast.error('会社情報の取得に失敗しました');
-        return;
-      }
-
-      setCompanies(data || []);
-    } catch (error) {
-      console.error('Unexpected error:', error);
-      await supabase.from('error_logs').insert([{
-        error_message: 'Unexpected error while fetching companies',
-        error_stack: error instanceof Error ? error.stack : String(error)
-      }]);
-      toast.error('予期せぬエラーが発生しました');
-    } finally {
-      setIsCompanyLoading(false);
-    }
-  };
-
-  const fetchStaffMembers = async (companyId: string) => {
+  const fetchAllStaffMembers = async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('staff_members')
-        .select('*')
-        .eq('company_id', companyId)
+        .select(`
+          *,
+          companies (
+            name
+          )
+        `)
         .order('name');
       
       if (error) {
@@ -290,7 +258,7 @@ function VisitorApp() {
             onClick={() => {
               if (visitorInfo.name) {
                 if (appointmentType === 'appointment') {
-                  setStep('company');
+                  setStep('staff');
                 } else {
                   handleWalkinNotification();
                 }
@@ -310,100 +278,80 @@ function VisitorApp() {
     </div>
   );
 
-  const renderCompanySelection = () => (
-    <div className="w-full max-w-2xl mx-auto animate-slide-in">
-      {renderBackButton(() => setStep('form'))}
-      <div className="bg-white p-6 sm:p-10 rounded-2xl shadow-xl glass-effect">
-        <h2 className="text-3xl sm:text-4xl font-bold mb-6 sm:mb-10 text-gray-800">担当者選択</h2>
-        <div className="grid grid-cols-1 gap-4 sm:gap-6">
-          {isCompanyLoading ? (
-            <div className="text-center text-gray-500 py-6 sm:py-8 text-lg sm:text-xl">
-              読み込み中...
-            </div>
-          ) : companies.length === 0 ? (
-            <div className="text-center text-gray-500 py-6 sm:py-8 text-lg sm:text-xl">
-              担当者情報が登録されていません
-            </div>
-          ) : (
-            companies.map((company, index) => (
-              <button
-                key={company.id}
-                onClick={() => {
-                  setSelectedCompany(company.id);
-                  setStep('staff');
-                }}
-                className="w-full p-4 sm:p-6 text-left border-2 rounded-xl hover:border-blue-500 hover:bg-blue-50/50
-                  transition-all duration-500 transform hover-lift ripple
-                  flex items-center group animate-scale-in"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                <div className="bg-gray-100 rounded-full p-2 sm:p-3 group-hover:bg-blue-100 transition-colors duration-300">
-                  <Building2 className="w-8 h-8 sm:w-12 sm:h-12 text-gray-600 group-hover:text-blue-600 transition-colors duration-300" />
-                </div>
-                <span className="text-xl sm:text-2xl font-medium ml-4 sm:ml-6 group-hover:text-blue-700 transition-colors duration-300">
-                  {company.name}
-                </span>
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  const renderStaffSelection = () => {
+    // Group staff members by first character of their name
+    const groupedStaff = staffMembers.reduce((acc, staff) => {
+      const firstChar = staff.name.charAt(0);
+      if (!acc[firstChar]) {
+        acc[firstChar] = [];
+      }
+      acc[firstChar].push(staff);
+      return acc;
+    }, {} as Record<string, StaffMember[]>);
 
-  const renderStaffSelection = () => (
-    <div className="w-full max-w-2xl mx-auto animate-slide-in">
-      {renderBackButton(() => setStep('company'))}
-      <div className="bg-white p-6 sm:p-10 rounded-2xl shadow-xl glass-effect">
-        <h2 className="text-3xl sm:text-4xl font-bold mb-6 sm:mb-10 text-gray-800">担当者選択</h2>
-        <div className="grid grid-cols-1 gap-4 sm:gap-6">
+    // Sort the keys (first characters) in Japanese alphabetical order
+    const sortedKeys = Object.keys(groupedStaff).sort((a, b) => a.localeCompare(b, 'ja'));
+
+    return (
+      <div className="w-full max-w-2xl mx-auto animate-slide-in">
+        {renderBackButton(() => setStep('form'))}
+        <div className="bg-white p-6 sm:p-10 rounded-2xl shadow-xl glass-effect">
+          <h2 className="text-3xl sm:text-4xl font-bold mb-6 sm:mb-10 text-gray-800">担当者選択</h2>
           {isLoading ? (
             <div className="text-center text-gray-500 py-6 sm:py-8 text-lg sm:text-xl">
               読み込み中...
             </div>
           ) : staffMembers.length === 0 ? (
             <div className="text-center text-gray-500 py-6 sm:py-8 text-lg sm:text-xl">
-              担当者が登録されていません
+              担当者情報が登録されていません
             </div>
           ) : (
-            staffMembers.map((staff, index) => (
-              <button
-                key={staff.id}
-                onClick={() => handleStaffSelect(staff.id)}
-                disabled={isLoading}
-                className="w-full p-4 sm:p-6 text-left border-2 rounded-xl hover:border-blue-500 hover:bg-blue-50/50
-                  transition-all duration-500 transform hover-lift ripple
-                  flex items-center group animate-scale-in disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                <div className="bg-gray-100 rounded-full p-2 sm:p-3 group-hover:bg-blue-100 transition-colors duration-300">
-                  {staff.photo_url ? (
-                    <img
-                      src={staff.photo_url}
-                      alt={staff.name}
-                      className="w-8 h-8 sm:w-12 sm:h-12 rounded-full object-cover"
-                    />
-                  ) : (
-                    <UserCircle className="w-8 h-8 sm:w-12 sm:h-12 text-gray-600 group-hover:text-blue-600 transition-colors duration-300" />
-                  )}
-                </div>
-                <div className="ml-4 sm:ml-6">
-                  <div className="text-xl sm:text-2xl font-medium group-hover:text-blue-700 transition-colors duration-300">
-                    {staff.name}
+            <div className="space-y-8">
+              {sortedKeys.map((key) => (
+                <div key={key} className="animate-scale-in">
+                  <h3 className="text-xl font-bold text-gray-700 mb-4 border-b-2 border-gray-200 pb-2">
+                    {key}
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    {groupedStaff[key].map((staff) => (
+                      <button
+                        key={staff.id}
+                        onClick={() => handleStaffSelect(staff.id)}
+                        disabled={isLoading}
+                        className="w-full p-4 text-left border-2 rounded-xl hover:border-blue-500 hover:bg-blue-50/50
+                          transition-all duration-300 transform hover-lift ripple
+                          flex items-center group disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <div className="bg-gray-100 rounded-full p-2 sm:p-3 group-hover:bg-blue-100 transition-colors duration-300">
+                          {staff.photo_url ? (
+                            <img
+                              src={staff.photo_url}
+                              alt={staff.name}
+                              className="w-8 h-8 sm:w-12 sm:h-12 rounded-full object-cover"
+                            />
+                          ) : (
+                            <UserCircle className="w-8 h-8 sm:w-12 sm:h-12 text-gray-600 group-hover:text-blue-600 transition-colors duration-300" />
+                          )}
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-lg sm:text-xl font-medium group-hover:text-blue-700 transition-colors duration-300">
+                            {staff.name}
+                          </div>
+                          <div className="text-sm sm:text-base text-gray-500 group-hover:text-blue-600 transition-colors duration-300">
+                            {staff.companies?.name} {staff.department && `/ ${staff.department}`}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                  {staff.department && (
-                    <div className="text-sm sm:text-base text-gray-500 group-hover:text-blue-600 transition-colors duration-300">
-                      {staff.department}
-                    </div>
-                  )}
                 </div>
-              </button>
-            ))
+              ))}
+            </div>
           )}
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderComplete = () => (
     <div className="w-full max-w-2xl mx-auto animate-slide-in">
@@ -429,7 +377,6 @@ function VisitorApp() {
       {step === 'home' && renderHome()}
       {step === 'appointment' && renderAppointmentSelection()}
       {step === 'form' && renderForm()}
-      {step === 'company' && renderCompanySelection()}
       {step === 'staff' && renderStaffSelection()}
       {step === 'complete' && renderComplete()}
     </div>
