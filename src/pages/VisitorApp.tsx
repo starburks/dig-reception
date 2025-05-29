@@ -207,7 +207,7 @@ function VisitorApp() {
     <div className="w-full max-w-2xl mx-auto animate-slide-in">
       {renderBackButton(() => setStep('home'))}
       <div className="bg-white p-6 sm:p-10 rounded-2xl shadow-xl glass-effect">
-        <h2 className="text-3xl sm:text-4xl font-bold mb-6 sm:mb-10 text-gray-800 text-center">ご予約の確認</h2>
+        <h2 className="text-3xl sm:text-4xl font-bold mb-6 sm:mb-10 text-gray-800 text-center">担当者の確認</h2>
         <div className="grid grid-cols-1 gap-6 sm:gap-8">
           <button
             onClick={() => {
@@ -220,7 +220,7 @@ function VisitorApp() {
           >
             <Calendar className="w-16 h-16 sm:w-20 sm:h-20 text-gray-600 group-hover:text-blue-600 transition-colors duration-300 mb-4" />
             <span className="text-2xl sm:text-3xl font-medium group-hover:text-blue-700 transition-colors duration-300">
-              ご予約のあるお客様
+              担当者を探す
             </span>
           </button>
           <button
@@ -234,7 +234,7 @@ function VisitorApp() {
           >
             <UserPlus className="w-16 h-16 sm:w-20 sm:h-20 text-gray-600 group-hover:text-blue-600 transition-colors duration-300 mb-4" />
             <span className="text-2xl sm:text-3xl font-medium group-hover:text-blue-700 transition-colors duration-300">
-              ご予約のないお客様
+              担当者がわからないお客様
             </span>
           </button>
         </div>
@@ -314,7 +314,7 @@ function VisitorApp() {
     <div className="w-full max-w-2xl mx-auto animate-slide-in">
       {renderBackButton(() => setStep('form'))}
       <div className="bg-white p-6 sm:p-10 rounded-2xl shadow-xl glass-effect">
-        <h2 className="text-3xl sm:text-4xl font-bold mb-6 sm:mb-10 text-gray-800">アポイント先選択</h2>
+        <h2 className="text-3xl sm:text-4xl font-bold mb-6 sm:mb-10 text-gray-800">担当者選択</h2>
         <div className="grid grid-cols-1 gap-4 sm:gap-6">
           {isCompanyLoading ? (
             <div className="text-center text-gray-500 py-6 sm:py-8 text-lg sm:text-xl">
@@ -322,7 +322,7 @@ function VisitorApp() {
             </div>
           ) : companies.length === 0 ? (
             <div className="text-center text-gray-500 py-6 sm:py-8 text-lg sm:text-xl">
-              会社情報が登録されていません
+              担当者情報が登録されていません
             </div>
           ) : (
             companies.map((company, index) => (
